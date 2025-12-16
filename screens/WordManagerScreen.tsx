@@ -108,6 +108,12 @@ export default function WordManagerScreen({navigation} : WordManagerProps) {
         disabled={loading} >
         <Text style={styles.screenButtonText}>전체 단어 보기</Text>
       </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.screenButton}
+        onPress={() => navigation.navigate("WholeWordStat")}
+        disabled={loading} >
+        <Text style={styles.screenButtonText}>전체 단어 스탯 보기</Text>
+      </TouchableOpacity>
 
       {updateCount > 0 && (
         <View style={styles.updateTextContainer}>

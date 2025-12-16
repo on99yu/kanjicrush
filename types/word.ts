@@ -21,3 +21,20 @@ export interface KanjiTableRow {
   createdAt: string;
   kanjiList: KanjiChar[];
 }
+
+export interface WordStatRow{
+  id: number;
+  wordId: string;
+  correctCount : number;
+  wrongCount : number;
+  lastansweredAt : number;
+}
+
+export interface StudyProgressRow {
+  id: number;
+  wordId: number;
+  accuracy: number;      // 학습률 (0~100)
+  correctCount: number;
+  wrongCount: number;
+  updatedAt: string;
+}

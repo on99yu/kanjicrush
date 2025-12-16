@@ -6,6 +6,7 @@ export type RootStackParamList = {
   MainTabs: {screen?: keyof RootTabParamList} | undefined;
   WordManager: undefined;
   WholeWordList: undefined;
+  WholeWordStat: undefined;
 };
 
 export type RootTabParamList = {

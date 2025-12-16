@@ -4,13 +4,16 @@ import { KanjiTableRow } from "../types/word";
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
 export const getDBConnection = async () => {
-    if (!dbInstance) {
+  if (!dbInstance) {
     dbInstance = await SQLite.openDatabaseAsync("kanji.db");
   }
   return dbInstance;
 };
 
 export const createTable = async (db: SQLite.SQLiteDatabase) => {
+
+  await db.execAsync(`PRAGMA foreign_keys = ON;`);
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS KanjiWord (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -41,9 +44,27 @@ export const createTable = async (db: SQLite.SQLiteDatabase) => {
         lastUpdated TEXT
         );
     `)
+
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS WordStats (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      wordId INTEGER NOT NULL UNIQUE,
+      correctCount INTEGER NOT NULL DEFAULT 0,
+      wrongCount INTEGER NOT NULL DEFAULT 0,
+      lastAnsweredAt INTEGER, -- ms timestamp (Date.now())
+      createdAt TEXT DEFAULT (datetime('now')),
+      updatedAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (wordId) REFERENCES KanjiWord(id) ON DELETE CASCADE
+    );
+  `);
+
+  await db.execAsync(`
+    CREATE INDEX IF NOT EXISTS idx_wordstats_lastAnsweredAt
+    ON WordStats(lastAnsweredAt);
+  `);
 };
 
-export const insertWordWithKanji = async (db:SQLite.SQLiteDatabase, word : KanjiTableRow) => {
+export const insertWordWithKanji = async (db: SQLite.SQLiteDatabase, word: KanjiTableRow) => {
   // 1. KanjiWord 삽입
   const result = await db.runAsync(
     `INSERT OR REPLACE INTO KanjiWord (id, word, reading, meaning, createdAt) 
@@ -71,3 +92,15 @@ export const insertWordWithKanji = async (db:SQLite.SQLiteDatabase, word : Kanji
   }
 
 };
+
+export const backfillWordStats = async (db: SQLite.SQLiteDatabase) => {
+  await db.execAsync(`PRAGMA foreign_keys = ON;`);
+
+  await db.execAsync(`
+    INSERT OR IGNORE INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt)
+    SELECT kw.id, 0, 0, NULL
+    FROM KanjiWord kw
+    LEFT JOIN WordStats ws ON ws.wordId = kw.id
+    WHERE ws.wordId IS NULL;
+    `);
+}
