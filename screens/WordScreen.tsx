@@ -13,7 +13,7 @@ function shuffleArray(array: any[]) {
 
 
 export default function WordScreen() {
-  const {words } =useContext(WordContext);
+  const { words } = useContext(WordContext);
 
   const [shuffledWords, setShuffledWords] = useState<any[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -103,7 +103,7 @@ export default function WordScreen() {
 
 const styles = StyleSheet.create({
   container: {
-    flex:1,
+    flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
@@ -129,11 +129,11 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
   },
   cardContainer: {
-    flex:1,
+    flex: 1,
     width: "100%",
   },
   navButtons: {
-    flex:1,
+    flex: 1,
     position: "absolute",
     bottom: 25,
     flexDirection: "row",
@@ -143,12 +143,12 @@ const styles = StyleSheet.create({
   },
   button: {
     padding: 15,
-    backgroundColor: "#3b82f6",
+    backgroundColor: "#6366f1",
     borderRadius: 8,
   },
   shuffleButton: {
     padding: 15,
-    backgroundColor: "#10b981", // 초록색으로 구분
+    backgroundColor: "#3b82f6", // 초록색으로 구분
     borderRadius: 8,
   },
   disabledButton: {

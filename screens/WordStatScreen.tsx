@@ -1,59 +1,124 @@
-import React, { useContext, useMemo } from "react";
-import { View, Text } from "react-native";
-import { WordManagerProps } from "../types/screen";
+import React, { useContext, useEffect, useMemo, useState } from "react";
+import { View, Text, FlatList, TouchableOpacity } from "react-native";
 import { WordStatContext } from "../context/WordStatContext";
-import { WordStatRow } from "../types/word";
+import { getDBConnection } from "../db/sqlite";
 import { getAccuracy } from "../utils/CalAccuracy";
-export default function WordStatScreen({ navigation }: WordManagerProps) {
+import { useNavigation } from "@react-navigation/native";
+import { ChevronLeft } from "lucide-react-native";
+
+type Row = { wordId: number; word: string };
+
+export default function WordStatScreen() {
+  const navigation = useNavigation();
   const { statsMap, loading } = useContext(WordStatContext);
+  const [wordMap, setWordMap] = useState<Record<number, string>>({});
 
-  // statsMap (Record)을 배열로 바꾸고 최근 답변한 순으로 정렬 후 5개만
-  const top5 = useMemo(() => {
+  const sortedList = useMemo(() => {
     const list = Object.values(statsMap);
-
     list.sort((a, b) => {
-      const aTime = a.lastAnsweredAt ?? 0;
-      const bTime = b.lastAnsweredAt ?? 0;
-      return bTime - aTime; // 최신이 위로
+      if (b.correctCount !== a.correctCount) return b.correctCount - a.correctCount;
+      const accA = getAccuracy(a);
+      const accB = getAccuracy(b);
+      if (accB !== accA) return accB - accA;
+      return (b.lastAnsweredAt ?? 0) - (a.lastAnsweredAt ?? 0);
     });
+    return list;
+  }, [statsMap]);
 
-    return list.slice(0, 5);
+  // ✅ stats에 있는 wordId만 KanjiWord에서 가져오기
+  useEffect(() => {
+    const loadWordsForStats = async () => {
+      try {
+        const ids = Object.keys(statsMap).map(Number);
+        if (ids.length === 0) {
+          setWordMap({});
+          return;
+        }
+
+        const db = await getDBConnection();
+
+        // SQLite IN (...) 파라미터 생성
+        const placeholders = ids.map(() => "?").join(",");
+        const rows: any[] = await db.getAllAsync(
+          `SELECT id as wordId, word FROM KanjiWord WHERE id IN (${placeholders})`,
+          ids
+        );
+
+        const map: Record<number, string> = {};
+        for (const r of rows) map[r.wordId] = r.word;
+
+        setWordMap(map);
+      } catch (e) {
+        console.error("WordStatScreen word 로드 실패:", e);
+      }
+    };
+
+    loadWordsForStats();
   }, [statsMap]);
 
   if (loading) {
     return (
-      <View>
+      <View style={{ padding: 16 }}>
         <Text>로딩중...</Text>
       </View>
     );
   }
-  return (
-    <View style={{ padding: 16, gap: 12 }}>
-      <Text style={{ fontSize: 18, fontWeight: "600" }}>단어 스탯 5개</Text>
 
-      {top5.length === 0 ? (
-        <Text>아직 스탯 데이터가 없어.</Text>
-      ) : (
-        top5.map((s) => (
-          <View
-            key={s.wordId}
-            style={{
-              padding: 12,
-              borderWidth: 1,
-              borderRadius: 10,
-            }}
-          >
-            <Text>wordId: {s.wordId}</Text>
-            <Text>정답: {s.correctCount}</Text>
-            <Text>오답: {s.wrongCount}</Text>
-            <Text>학습률: {getAccuracy(s)}%</Text>
-            <Text>
-              마지막 답변:{" "}
-              {s.lastAnsweredAt ? new Date(s.lastAnsweredAt).toLocaleString() : "-"}
-            </Text>
-          </View>
-        ))
-      )}
+  return (
+    <View style={{ flex: 1, padding: 16, gap: 16, }}>
+      <View style={{
+        flexDirection: "row",
+        justifyContent: "space-between",
+        alignItems: "center",
+      }}>
+        <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 10 }}>
+          단어 스탯 (맞춘갯수 많은 순)
+        </Text>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={{
+            paddingVertical: 8, paddingHorizontal: 8, marginRight: 8,
+            borderWidth: 1, borderColor: "#4A90E2", borderRadius: 10,
+          }}
+        >
+          <ChevronLeft size={24} color="#111827" />
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        data={sortedList}
+        keyExtractor={(item) => String(item.wordId)}
+        contentContainerStyle={{ gap: 8, paddingBottom: 24 }}
+        renderItem={({ item }) => {
+          const word = wordMap[item.wordId] ?? `wordId:${item.wordId}`;
+          const acc = getAccuracy(item);
+
+          return (
+            <View
+              style={{
+                paddingVertical: 10,
+                paddingHorizontal: 12,
+                borderWidth: 1,
+                borderRadius: 10,
+                flexDirection: "row",
+                justifyContent: "space-between",
+                alignItems: "center",
+              }}
+            >
+              <Text
+                style={{ fontSize: 16, fontWeight: "600", flexShrink: 1 }}
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {word}
+              </Text>
+
+              <Text style={{ fontSize: 14, marginLeft: 10 }}>
+                학습률 {acc}% · 맞춤 {item.correctCount}
+              </Text>
+            </View>
+          );
+        }}
+      />
     </View>
   );
 }

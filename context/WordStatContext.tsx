@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect,useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { createContext, ReactNode } from "react";
 import { getDBConnection } from "../db/sqlite";
 import { WordStatRow } from "../types/word";
@@ -70,7 +70,7 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
                 if (current) {
                     await db.runAsync(
                         `UPDATE WordStats 
-                        SET correctCount = ?, wrongCount = ?, lastAnsweredAt = ?, updateAt = datetime('now')
+                        SET correctCount = ?, wrongCount = ?, lastAnsweredAt = ?, updatedAt = datetime('now')
                         WHERE wordId = ?`,
                         [nextCorrect, nextWrong, nextLastAnsweredAt, wordId]
                     );
@@ -104,28 +104,28 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
         }, [statsMap]
     )
 
-    const resetStats = useCallback(async (wordId: number)=>{
-        try{
+    const resetStats = useCallback(async (wordId: number) => {
+        try {
             const db = await getDBConnection();
-            await db.runAsync("DELETE FROM WordStats WHERE wordId = ?",[wordId]);
+            await db.runAsync("DELETE FROM WordStats WHERE wordId = ?", [wordId]);
 
-            setStatsMap((prev)=>{
-                const copied = {...prev};
+            setStatsMap((prev) => {
+                const copied = { ...prev };
                 delete copied[wordId];
                 return copied;
             })
-        }catch(e){
-            console.error("WordStats 리셋 실패",e);
+        } catch (e) {
+            console.error("WordStats 리셋 실패", e);
         }
-    },[]);
+    }, []);
 
-    const value = useMemo(()=>({
+    const value = useMemo(() => ({
         statsMap,
         loading,
         refreshStats: loadStats,
         updateProgress,
         resetStats,
-    }),[statsMap, loading, loadStats, updateProgress, resetStats])
+    }), [statsMap, loading, loadStats, updateProgress, resetStats])
 
     return (
         <WordStatContext.Provider value={value}>

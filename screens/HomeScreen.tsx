@@ -1,15 +1,17 @@
-import React,{ useContext, useMemo}from "react";
+import React, { useContext, useMemo } from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { HomeScreenProps } from "../types/screen";
 import { WordContext } from "../context/WordContext";
 import { WordStatContext } from "../context/WordStatContext";
 import { isKnownWord } from "../utils/isKnownWord";
 import { getAccuracy } from "../utils/CalAccuracy";
+import { Settings } from "lucide-react-native";
+
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
 
-  const { words, loading: wordLoading} = useContext(WordContext);
-  const {statsMap, loading: statLoading } = useContext(WordStatContext)
+  const { words, loading: wordLoading } = useContext(WordContext);
+  const { statsMap, loading: statLoading } = useContext(WordStatContext)
   const summary = useMemo(() => {
     const totalWords = words.length;
 
@@ -17,16 +19,15 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     const studiedStats = Object.values(statsMap);
     const studiedCount = studiedStats.length;
 
-    const knownCount = studiedStats.filter((s) => isKnownWord(s)).length;
-
+    const knownCount = studiedStats.filter((s) => isKnownWord(s)).length
     // 평균 정확도: "학습 기록이 있는 단어" 기준 평균
     const accuracy =
       studiedCount === 0
         ? 0
         : Math.round(
-            studiedStats.reduce((sum, s) => sum + getAccuracy(s), 0) /
-              studiedCount
-          );
+          studiedStats.reduce((sum, s) => sum + getAccuracy(s), 0) /
+          studiedCount
+        );
 
     return { totalWords, studiedCount, knownCount, accuracy };
   }, [words, statsMap]);
@@ -36,17 +37,24 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Kanji Crush</Text>
-      <View>
-        <View>
-          <Text>
-            학습한 단어 수
-          </Text>
-          <Text>
-
-          </Text>
+      <View style={styles.progressCard}>
+        <View style={{ alignItems: "flex-start", paddingHorizontal: 16, }}>
+          <Text style={{ fontSize: 20, color: "#fff" }}>학습 진척도</Text>
         </View>
-        <View>
-            
+        <View style={styles.progressBlock}>
+          <View style={styles.DetailBlock}>
+            <Text style={{ color: "#fff", fontSize: 12 }}>학습한 단어 수</Text>
+            <Text style={{ color: "#fff", fontSize: 24 }} >
+              {summary.knownCount}{""}
+              <Text style={{ fontSize: 16 }}> / {summary.totalWords}</Text>
+            </Text>
+          </View>
+          <View style={styles.DetailBlock}>
+            <Text style={{ color: "#fff", fontSize: 12 }} >평균 학습 정확도</Text>
+            <Text style={{ color: "#fff", fontSize: 24 }}>{summary.accuracy}
+              <Text style={{ color: "#fff", fontSize: 12 }}> %</Text>
+            </Text>
+          </View>
         </View>
       </View>
       <TouchableOpacity
@@ -59,6 +67,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         style={styles.WordManagerbutton}
         onPress={() => navigation.navigate("WordManager")}
       >
+        <Settings size={24} color={"#9CA3AF"}></Settings>
         <Text style={styles.buttonText}>단어장 관리</Text>
       </TouchableOpacity>
     </View>
@@ -70,39 +79,71 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    gap: 30,
+
     backgroundColor: "#fff",
+
   },
   title: {
+    marginBottom: 40,
+
     fontSize: 32,
     fontWeight: "bold",
-    marginBottom: 40,
+  },
+  progressCard: {
+    justifyContent: "center",
+    gap: 15,
+
+    width: "80%",
+    height: "25%",
+
+    backgroundColor: "#6366f1",
+    borderRadius: 12,
+  },
+  progressBlock: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 25,
+
+  },
+  DetailBlock: {
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    borderRadius: 12,
+    gap: 6,
+    alignItems: "flex-start",
+
+    width: "45%",
+
+    backgroundColor: "#FFFFFF1A"
   },
   WordStudybutton: {
-    backgroundColor: "#4f46e5", // indigo-600
+
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+
+    backgroundColor: "fff",
+    borderColor: "#15803d",
+    borderWidth: 1
+
   },
   WordManagerbutton: {
-    backgroundColor: "#4f46e5", // indigo-600
+    alignContent: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 8,
+
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    marginTop: 20,
+
+    backgroundColor: "#fff",
+    borderColor: "#15803d",
+    borderWidth: 1
   },
   buttonText: {
-    color: "#fff",
+    color: "black",
     fontSize: 16,
-    fontWeight: "600",
   },
 });

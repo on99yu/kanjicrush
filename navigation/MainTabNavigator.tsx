@@ -1,5 +1,6 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Ionicons } from "@expo/vector-icons"; 
+import {BookOpen, BarChart2, Home, BrainCircuit} from 'lucide-react-native';
 import WordScreen from "../screens/WordScreen";
 import HomeScreen from "../screens/HomeScreen";
 import WordTestScreen from "../screens/WordTestScreen";
@@ -12,8 +13,11 @@ export default function MainTabNavigator() {
     <Tab.Navigator
       screenOptions={{
         headerShown: false,
-        tabBarStyle: { elevation: 0, height: "9%" },
-        tabBarActiveTintColor: "#3b82f6",   // 활성 탭 색상
+        tabBarStyle: { elevation: 0, height: 70, paddingBottom:10, paddingTop: 8, },
+        tabBarItemStyle:{
+          paddingVertical:6,
+        },
+        tabBarActiveTintColor: "#4f46e5",   // 활성 탭 색상
         tabBarInactiveTintColor: "#a0aec0", // 비활성 탭 색상
       }}
     >
@@ -23,7 +27,7 @@ export default function MainTabNavigator() {
         options={{
           tabBarLabel: "홈", // 탭에 표시될 텍스트
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="home-outline" size={size} color={color} />
+            <Home color={color} size={size}/>
           ),
         }}
       />
@@ -33,7 +37,7 @@ export default function MainTabNavigator() {
         options={{
           tabBarLabel: "단어 학습",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="book-outline" size={size} color={color} />
+            <BookOpen color={color} size={size}/>
           ),
         }}
       />
@@ -41,9 +45,9 @@ export default function MainTabNavigator() {
         name="WordTest"
         component={WordTestScreen}
         options={{
-          tabBarLabel: "단어 시험",
+          tabBarLabel: "단어 퀴즈",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="book-outline" size={size} color={color} />
+            <BrainCircuit size={size} color={color} />
           ),
         }}
       />

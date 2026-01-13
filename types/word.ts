@@ -24,17 +24,17 @@ export interface KanjiTableRow {
 
 export interface WordStatRow{
   id: number;
-  wordId: string;
-  correctCount : number;
-  wrongCount : number;
-  lastansweredAt : number;
-}
-
-export interface StudyProgressRow {
-  id: number;
   wordId: number;
-  accuracy: number;      // 학습률 (0~100)
   correctCount: number;
   wrongCount: number;
+  lastAnsweredAt: number | null;
+  createdAt: string;
   updatedAt: string;
 }
+
+// export const getAccuracy = (stats?: WordStatRow) =>{
+//   const c = stats?.correctCount ?? 0;
+//   const w = stats?.wrongCount ?? 0;
+//   const total = c + w
+//   return total === 0 ? 0 : Math.round((c/total)*100)
+// }

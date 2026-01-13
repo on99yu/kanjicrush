@@ -1,8 +1,12 @@
 import React, { useContext, useState } from "react";
-import { View, Text, FlatList, StyleSheet, Button } from "react-native";
+import { View, Text, FlatList, StyleSheet, Button, TouchableOpacity } from "react-native";
 import { WordContext } from "../context/WordContext";
+import { useNavigation } from "@react-navigation/native";
+import { ChevronLeft } from "lucide-react-native";
 
 export default function KanjiWordListScreen() {
+
+  const navigation = useNavigation()
   const { words, loading } = useContext(WordContext);
 
   // 페이지네이션 상태
@@ -26,6 +30,19 @@ export default function KanjiWordListScreen() {
 
   return (
     <View style={styles.container}>
+
+      <TouchableOpacity
+        onPress={() => navigation.goBack()}
+        style={{
+          width: '15%',
+          justifyContent: "center",
+          alignItems: "center",
+          paddingVertical: 8, paddingHorizontal: 8, marginRight: 8,
+          borderWidth: 1, borderColor: "#4A90E2", borderRadius: 10,
+        }}
+      >
+        <ChevronLeft size={24} color="#111827" />
+      </TouchableOpacity>
       {/* 테이블 헤더 */}
       <View style={[styles.row, styles.header]}>
         <Text style={[styles.cell, styles.headerText]}>단어</Text>
@@ -63,6 +80,7 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 12,
     backgroundColor: "#fff",
+    gap: 16,
   },
   row: {
     flexDirection: "row",
