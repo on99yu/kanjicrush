@@ -22,6 +22,18 @@ export interface KanjiTableRow {
   kanjiList: KanjiChar[];
 }
 
+export interface SQLiteKanjiWordRow {
+  id: number;
+  word: string;
+  reading: string;
+  meaning: string;
+  createdAt: string;
+}
+
+export interface SQLiteKanjiCharRow extends KanjiChar {
+  wordId: number;
+}
+
 export interface WordStatRow{
   id: number;
   wordId: number;

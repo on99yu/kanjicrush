@@ -62,45 +62,97 @@ export const createTable = async (db: SQLite.SQLiteDatabase) => {
     CREATE INDEX IF NOT EXISTS idx_wordstats_lastAnsweredAt
     ON WordStats(lastAnsweredAt);
   `);
+
+  // 이전 버전에서 모든 단어에 생성했던 빈 통계 행을 정리한다.
+  await db.runAsync(`
+    DELETE FROM WordStats
+    WHERE correctCount = 0 AND wrongCount = 0 AND lastAnsweredAt IS NULL
+  `);
 };
 
-export const insertWordWithKanji = async (db: SQLite.SQLiteDatabase, word: KanjiTableRow) => {
-  // 1. KanjiWord 삽입
-  const result = await db.runAsync(
-    `INSERT OR REPLACE INTO KanjiWord (id, word, reading, meaning, createdAt) 
-     VALUES (?, ?, ?, ?, ?)`,
-    [word.id, word.word, word.reading, word.meaning, word.createdAt]
-  );
-
-  // 2. 기존 KanjiChar 삭제 후 다시 삽입
-  await db.runAsync(`DELETE FROM KanjiChar WHERE wordId = ?`, [word.id]);
-
-  for (const kanji of word.kanjiList) {
-    await db.runAsync(
-      `INSERT INTO KanjiChar (id, kanji, onyomi, kunyomi, position, wordId, createdAt) 
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        kanji.id,
-        kanji.kanji,
-        kanji.onyomi,
-        kanji.kunyomi,
-        kanji.position,
-        word.id,
-        kanji.createdAt,
-      ]
-    );
-  }
-
+export const initializeDatabase = async () => {
+  const db = await getDBConnection();
+  await createTable(db);
+  return db;
 };
 
-export const backfillWordStats = async (db: SQLite.SQLiteDatabase) => {
-  await db.execAsync(`PRAGMA foreign_keys = ON;`);
-
-  await db.execAsync(`
-    INSERT OR IGNORE INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt)
-    SELECT kw.id, 0, 0, NULL
-    FROM KanjiWord kw
-    LEFT JOIN WordStats ws ON ws.wordId = kw.id
-    WHERE ws.wordId IS NULL;
+export const syncWords = async (
+  db: SQLite.SQLiteDatabase,
+  words: KanjiTableRow[]
+) => {
+  await db.withTransactionAsync(async () => {
+    await db.execAsync(`
+      CREATE TEMP TABLE IF NOT EXISTS SyncWordIds (
+        id INTEGER PRIMARY KEY
+      );
+      DELETE FROM SyncWordIds;
+      DELETE FROM KanjiChar;
     `);
-}
+
+    const upsertWord = await db.prepareAsync(
+      `INSERT INTO KanjiWord (id, word, reading, meaning, createdAt)
+         VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(id) DO UPDATE SET
+           word = excluded.word,
+           reading = excluded.reading,
+           meaning = excluded.meaning,
+           createdAt = excluded.createdAt`
+    );
+    const insertSyncWordId = await db.prepareAsync(
+      "INSERT INTO SyncWordIds (id) VALUES (?)"
+    );
+    const insertKanji = await db.prepareAsync(
+      `INSERT INTO KanjiChar (id, kanji, onyomi, kunyomi, position, wordId, createdAt)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+    );
+
+    try {
+      for (const word of words) {
+        await upsertWord.executeAsync([
+          word.id,
+          word.word,
+          word.reading,
+          word.meaning,
+          word.createdAt,
+        ]);
+
+        await insertSyncWordId.executeAsync([word.id]);
+
+        for (const kanji of word.kanjiList) {
+          await insertKanji.executeAsync([
+            kanji.id,
+            kanji.kanji,
+            kanji.onyomi,
+            kanji.kunyomi,
+            kanji.position,
+            word.id,
+            kanji.createdAt,
+          ]);
+        }
+      }
+    } finally {
+      await upsertWord.finalizeAsync();
+      await insertSyncWordId.finalizeAsync();
+      await insertKanji.finalizeAsync();
+    }
+
+    await db.execAsync(`
+      DELETE FROM KanjiWord
+      WHERE id NOT IN (SELECT id FROM SyncWordIds);
+    `);
+
+    await db.runAsync(
+      "INSERT INTO UpdateLog (updatedCount, lastUpdated) VALUES (?, ?)",
+      [words.length, new Date().toISOString()]
+    );
+  });
+};
+
+export const deleteAllWords = async (db: SQLite.SQLiteDatabase) => {
+  await db.withTransactionAsync(async () => {
+    await db.execAsync(`
+      DELETE FROM KanjiWord;
+      DELETE FROM UpdateLog;
+    `);
+  });
+};

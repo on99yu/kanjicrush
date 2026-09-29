@@ -62,7 +62,14 @@ export default function KanjiWordListScreen() {
           </View>
         )}
         ListFooterComponent={
-          hasMore ? (
+          words.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyTitle}>저장된 단어가 없습니다.</Text>
+              <Text style={styles.emptyDescription}>
+                단어장 관리에서 서버 단어를 업데이트해 주세요.
+              </Text>
+            </View>
+          ) : hasMore ? (
             <View style={styles.footer}>
               <Button title="더 불러오기" onPress={loadMore} />
             </View>
@@ -107,5 +114,20 @@ const styles = StyleSheet.create({
     textAlign: "center",
     color: "#666",
     marginVertical: 8,
+  },
+  emptyState: {
+    alignItems: "center",
+    paddingHorizontal: 24,
+    paddingVertical: 48,
+  },
+  emptyTitle: {
+    color: "#111827",
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  emptyDescription: {
+    marginTop: 8,
+    color: "#64748b",
+    textAlign: "center",
   },
 });

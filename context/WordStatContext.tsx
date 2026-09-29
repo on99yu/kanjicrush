@@ -61,47 +61,34 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
         async (wordId: number, isCorrect: boolean) => {
             const db = await getDBConnection();
 
-            const current = statsMap[wordId];
-            const nextCorrect = (current?.correctCount ?? 0) + (isCorrect ? 1 : 0);
-            const nextWrong = (current?.wrongCount ?? 0) + (isCorrect ? 0 : 1);
             const nextLastAnsweredAt = Date.now();
 
             try {
-                if (current) {
-                    await db.runAsync(
-                        `UPDATE WordStats 
-                        SET correctCount = ?, wrongCount = ?, lastAnsweredAt = ?, updatedAt = datetime('now')
-                        WHERE wordId = ?`,
-                        [nextCorrect, nextWrong, nextLastAnsweredAt, wordId]
-                    );
-                } else {
-                    await db.runAsync(
-                        `INSERT INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt)
-                        VALUES (?, ?, ?, ?)`,
-                        [wordId, nextCorrect, nextWrong, nextLastAnsweredAt]
-                    );
+                await db.runAsync(
+                    `INSERT INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt)
+                     VALUES (?, ?, ?, ?)
+                     ON CONFLICT(wordId) DO UPDATE SET
+                       correctCount = WordStats.correctCount + excluded.correctCount,
+                       wrongCount = WordStats.wrongCount + excluded.wrongCount,
+                       lastAnsweredAt = excluded.lastAnsweredAt,
+                       updatedAt = datetime('now')`,
+                    [wordId, isCorrect ? 1 : 0, isCorrect ? 0 : 1, nextLastAnsweredAt]
+                );
+
+                const updated = await db.getFirstAsync<WordStatRow>(
+                    "SELECT * FROM WordStats WHERE wordId = ?",
+                    [wordId]
+                );
+
+                if (updated) {
+                    setStatsMap((prev) => ({ ...prev, [wordId]: updated }));
                 }
-
-                setStatsMap((prev) => {
-                    const prevRow = prev[wordId]
-
-                    const nextRow: WordStatRow = {
-                        id: prevRow?.id ?? Date.now(),
-                        wordId,
-                        correctCount: nextCorrect,
-                        wrongCount: nextWrong,
-                        lastAnsweredAt: nextLastAnsweredAt,
-                        createdAt: prevRow?.createdAt ?? new Date().toISOString(),
-                        updatedAt: new Date().toISOString(),
-                    };
-
-                    return { ...prev, [wordId]: nextRow };
-                })
 
             } catch (e) {
                 console.error("WordStats 업데이트 실패:", e)
+                throw e;
             }
-        }, [statsMap]
+        }, []
     )
 
     const resetStats = useCallback(async (wordId: number) => {
@@ -134,4 +121,3 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
     )
 
 }
-

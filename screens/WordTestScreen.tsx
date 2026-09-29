@@ -1,41 +1,60 @@
-import React, { useState, useEffect, useContext } from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+import React, { useState, useEffect, useContext, useCallback } from "react";
+import { ActivityIndicator, Alert, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { WordContext } from "../context/WordContext";
 import WordTestCard from "../components/WordTestCard";
 import { Check, Eye, X } from "lucide-react-native";
 import { WordStatContext } from "../context/WordStatContext";
+import { KanjiTableRow } from "../types/word";
+import { shuffleArray } from "../utils/shuffleArray";
 
-// 배열 섞기
-function shuffleArray(array: any[]) {
-  return array
-    .map((item) => ({ item, sort: Math.random() }))
-    .sort((a, b) => a.sort - b.sort)
-    .map(({ item }) => item);
-}
+const DAILY_LIMIT = 100;
 
 export default function WordTestScreen() {
-  const { words } = useContext(WordContext);
+  const { words, loading } = useContext(WordContext);
   const { updateProgress } = useContext(WordStatContext);
 
-  const dailyLimit = 100; // 하루 학습 단어 수
-  const [testWords, setTestWords] = useState<any[]>([]);
+  const [testWords, setTestWords] = useState<KanjiTableRow[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [results, setResults] = useState<(null | "correct" | "wrong")[]>([]);
+  const [submitting, setSubmitting] = useState(false);
 
-
+  const startQuiz = useCallback(() => {
+    const selected = shuffleArray(words).slice(0, DAILY_LIMIT);
+    setTestWords(selected);
+    setCurrentIndex(0);
+    setShowAnswer(false);
+    setResults(new Array(selected.length).fill(null));
+    setSubmitting(false);
+  }, [words]);
 
   useEffect(() => {
     if (words.length > 0) {
-      const selected = shuffleArray(words).slice(0, dailyLimit);
-      setTestWords(selected);
-      setCurrentIndex(0);
-      setShowAnswer(false);
-      setResults(new Array(selected.length).fill(null));
+      startQuiz();
+    } else {
+      setTestWords([]);
     }
-  }, [words]);
+  }, [words, startQuiz]);
 
-  if (testWords.length === 0) return null;
+  if (loading) {
+    return (
+      <View style={styles.emptyContainer}>
+        <ActivityIndicator size="large" color="#6366f1" />
+        <Text style={styles.emptyDescription}>퀴즈를 준비하고 있습니다.</Text>
+      </View>
+    );
+  }
+
+  if (testWords.length === 0) {
+    return (
+      <View style={styles.emptyContainer}>
+        <Text style={styles.emptyTitle}>퀴즈에 사용할 단어가 없습니다.</Text>
+        <Text style={styles.emptyDescription}>
+          홈의 단어장 관리에서 단어를 먼저 업데이트해 주세요.
+        </Text>
+      </View>
+    );
+  }
 
   const total = testWords.length;
   const currentWord = testWords[currentIndex];
@@ -49,28 +68,31 @@ export default function WordTestScreen() {
 
   // 정답 결과 처리 동작 함수
   const handleResult = async (result: "correct" | "wrong") => {
+    if (submitting) return;
 
     const isCorrect = result === "correct";
     const wordId = currentWord?.id;
 
-    // 로컬 결과 저장
-    setResults((prev) => {
-      const updated = [...prev];
-      updated[currentIndex] = result;
-      return updated;
-    })
+    if (typeof wordId !== "number") return;
 
-    // 스탯 업데이트
-    if (typeof wordId === "number") {
+    setSubmitting(true);
+    try {
       await updateProgress(wordId, isCorrect);
-    } else {
-      console.warn("currentWord.id가 숫자가 아님. wordId 매핑 확인 필요", currentWord)
-    }
 
-    // 다음 단어로 이동
-    if (currentIndex < total - 1) {
-      setCurrentIndex(currentIndex + 1);
-      setShowAnswer(false);
+      setResults((prev) => {
+        const updated = [...prev];
+        updated[currentIndex] = result;
+        return updated;
+      });
+
+      if (currentIndex < total - 1) {
+        setCurrentIndex((index) => index + 1);
+        setShowAnswer(false);
+      }
+    } catch {
+      Alert.alert("저장 실패", "학습 기록을 저장하지 못했습니다. 다시 시도해주세요.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -112,13 +134,15 @@ export default function WordTestScreen() {
           <View style={styles.resultButtons}>
             <TouchableOpacity
               onPress={() => handleResult("wrong")}
-              style={[styles.resultButton, styles.wrongButton]}
+              disabled={submitting}
+              style={[styles.resultButton, styles.wrongButton, submitting && styles.disabledButton]}
             >
               <X size={24} color="#b91c1c" /><Text style={{ color: "#b91c1c", fontSize: 16 }}>틀렸다</Text>
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => handleResult("correct")}
-              style={[styles.resultButton, styles.correctButton]}
+              disabled={submitting}
+              style={[styles.resultButton, styles.correctButton, submitting && styles.disabledButton]}
             >
               <Check size={24} color="#15803d" /><Text style={{ color: "#15803d", fontSize: 16 }}>맞췄다</Text>
             </TouchableOpacity>
@@ -131,6 +155,9 @@ export default function WordTestScreen() {
             <Text style={styles.summaryText}>
               정답: {correctCount} / 오답: {wrongCount}
             </Text>
+            <TouchableOpacity onPress={startQuiz} style={styles.restartButton}>
+              <Text style={styles.restartButtonText}>새 퀴즈 시작</Text>
+            </TouchableOpacity>
           </View>
         )}
       </View>
@@ -139,11 +166,30 @@ export default function WordTestScreen() {
 }
 
 const styles = StyleSheet.create({
+  emptyContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    padding: 24,
+    backgroundColor: "#f9fafb",
+  },
+  emptyTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#111827",
+  },
+  emptyDescription: {
+    fontSize: 15,
+    color: "#64748b",
+    textAlign: "center",
+  },
   container: {
     flex: 1,
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: "#f9fafb",
-    paddingTop: 250
+    padding: 16,
   },
   progressWrapper: {
     width: "90%",
@@ -201,7 +247,7 @@ const styles = StyleSheet.create({
   resultButtons: {
     flexDirection: "row",
     marginTop: 24,
-    gap: 50,
+    gap: 16,
   },
   resultButton: {
     flexDirection: "row",
@@ -216,6 +262,9 @@ const styles = StyleSheet.create({
   correctButton: {
     backgroundColor: "#dcfce7",
   },
+  disabledButton: {
+    opacity: 0.5,
+  },
   summaryBox: {
     alignItems: "center",
     marginTop: 12,
@@ -224,5 +273,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#374151",
+  },
+  restartButton: {
+    marginTop: 16,
+    borderRadius: 9999,
+    backgroundColor: "#4f46e5",
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+  },
+  restartButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
 });

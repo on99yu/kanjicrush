@@ -39,7 +39,7 @@ export default function WordStatScreen() {
 
         // SQLite IN (...) 파라미터 생성
         const placeholders = ids.map(() => "?").join(",");
-        const rows: any[] = await db.getAllAsync(
+        const rows = await db.getAllAsync<Row>(
           `SELECT id as wordId, word FROM KanjiWord WHERE id IN (${placeholders})`,
           ids
         );
@@ -72,7 +72,7 @@ export default function WordStatScreen() {
         alignItems: "center",
       }}>
         <Text style={{ fontSize: 18, fontWeight: "600", marginBottom: 10 }}>
-          단어 스탯 (맞춘갯수 많은 순)
+          단어 통계 (정답 수가 많은 순)
         </Text>
         <TouchableOpacity
           onPress={() => navigation.goBack()}
@@ -88,6 +88,16 @@ export default function WordStatScreen() {
         data={sortedList}
         keyExtractor={(item) => String(item.wordId)}
         contentContainerStyle={{ gap: 8, paddingBottom: 24 }}
+        ListEmptyComponent={
+          <View style={{ alignItems: "center", paddingVertical: 48 }}>
+            <Text style={{ fontSize: 18, fontWeight: "700", color: "#111827" }}>
+              아직 학습 기록이 없습니다.
+            </Text>
+            <Text style={{ marginTop: 8, color: "#64748b", textAlign: "center" }}>
+              단어 퀴즈를 풀면 정답률과 학습 기록이 표시됩니다.
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => {
           const word = wordMap[item.wordId] ?? `wordId:${item.wordId}`;
           const acc = getAccuracy(item);

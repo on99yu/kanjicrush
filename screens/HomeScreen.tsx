@@ -1,5 +1,5 @@
 import React, { useContext, useMemo } from "react";
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { ActivityIndicator, View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { HomeScreenProps } from "../types/screen";
 import { WordContext } from "../context/WordContext";
 import { WordStatContext } from "../context/WordStatContext";
@@ -34,6 +34,15 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   const loading = wordLoading || statLoading;
 
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#6366f1" />
+        <Text>학습 현황을 불러오고 있습니다.</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Kanji Crush</Text>
@@ -43,7 +52,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         </View>
         <View style={styles.progressBlock}>
           <View style={styles.DetailBlock}>
-            <Text style={{ color: "#fff", fontSize: 12 }}>학습한 단어 수</Text>
+            <Text style={{ color: "#fff", fontSize: 12 }}>외운 단어 수</Text>
             <Text style={{ color: "#fff", fontSize: 24 }} >
               {summary.knownCount}{""}
               <Text style={{ fontSize: 16 }}> / {summary.totalWords}</Text>
@@ -79,24 +88,21 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    gap: 30,
-
+    gap: 24,
+    paddingHorizontal: 20,
     backgroundColor: "#fff",
-
   },
   title: {
-    marginBottom: 40,
-
     fontSize: 32,
     fontWeight: "bold",
   },
   progressCard: {
     justifyContent: "center",
     gap: 15,
-
-    width: "80%",
-    height: "25%",
-
+    width: "100%",
+    maxWidth: 640,
+    minHeight: 160,
+    paddingVertical: 22,
     backgroundColor: "#6366f1",
     borderRadius: 12,
   },
@@ -118,12 +124,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF1A"
   },
   WordStudybutton: {
-
+    minWidth: 210,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,
 
-    backgroundColor: "fff",
+    backgroundColor: "#fff",
     borderColor: "#15803d",
     borderWidth: 1
 
@@ -134,6 +140,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
 
+    minWidth: 210,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 12,

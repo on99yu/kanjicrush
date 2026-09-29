@@ -1,14 +1,22 @@
 import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
 import { fetchKanjiData } from "../api/kanjiApi";
-import { useState, useEffect, } from "react";
-import { getDBConnection, insertWordWithKanji } from "../db/sqlite";
+import { useContext, useState, useEffect, } from "react";
+import { deleteAllWords, getDBConnection, syncWords } from "../db/sqlite";
 import { UpdateLogRow } from "../types/word";
 import { WordManagerProps } from "../types/screen";
+import { WordContext } from "../context/WordContext";
+import { WordStatContext } from "../context/WordStatContext";
 
 export default function WordManagerScreen({ navigation }: WordManagerProps) {
   const [loading, setLoading] = useState(false);
   const [updateCount, setUpdateCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    text: string;
+  } | null>(null);
+  const { refreshWords } = useContext(WordContext);
+  const { refreshStats } = useContext(WordStatContext);
 
   useEffect(() => {
     const loadLastUpdate = async () => {
@@ -32,14 +40,13 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
 
   const handleUpdateWords = async () => {
     setLoading(true);
+    setFeedback(null);
     try {
       const data = await fetchKanjiData();
       const db = await getDBConnection();
 
-      await db.runAsync(
-        `INSERT INTO UpdateLog (updatedCount, lastUpdated) VALUES (?, ?)`,
-        [data.length, new Date().toISOString()]
-      );
+      await syncWords(db, data);
+      await Promise.all([refreshWords(), refreshStats()]);
 
       const rows: UpdateLogRow[] = await db.getAllAsync(
         "SELECT * FROM UpdateLog ORDER BY id DESC LIMIT 1"
@@ -50,17 +57,16 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
         setLastUpdated(new Date(rows[0].lastUpdated).toLocaleString());
       }
 
-      for (const word of data) {
-        await insertWordWithKanji(db, word);
-      }
-
-      Alert.alert(
-        "업데이트 완료",
-        `${data.length}개의 단어가 성공적으로 업데이트되었습니다.`,
-        [{ text: "확인" }]
-      );
+      setFeedback({
+        tone: "success",
+        text: `${data.length}개의 단어를 최신 상태로 동기화했습니다.`,
+      });
     } catch (error) {
-      Alert.alert("업데이트 실패", "단어 업데이트 중 오류가 발생했습니다.");
+      console.error("단어 업데이트 실패:", error);
+      setFeedback({
+        tone: "error",
+        text: "서버에 연결하지 못했거나 받은 데이터가 올바르지 않습니다. 잠시 후 다시 시도해 주세요.",
+      });
     } finally {
       setLoading(false);
     }
@@ -69,7 +75,7 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
   const handleDeleteAllWords = () => {
     Alert.alert(
       "전체 단어 삭제",
-      "정말 모든 단어를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.",
+      "모든 단어와 학습 기록이 이 기기에서 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
       [
         {
           text: "취소",
@@ -79,10 +85,12 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
           text: "삭제",
           style: "destructive",
           onPress: async () => {
+            setLoading(true);
             try {
               const db = await getDBConnection();
 
-              await db.runAsync("DELETE FROM Words");
+              await deleteAllWords(db);
+              await Promise.all([refreshWords(), refreshStats()]);
 
               setUpdateCount(0);
               setLastUpdated(null);
@@ -91,6 +99,8 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
             } catch (error) {
               console.error("전체 단어 삭제 실패:", error);
               Alert.alert("삭제 실패", "단어 삭제 중 오류가 발생했습니다.");
+            } finally {
+              setLoading(false);
             }
           },
         },
@@ -117,12 +127,12 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
           onPress={() => navigation.navigate("WholeWordStat")}
           disabled={loading}
         >
-          <Text style={styles.primaryBtnText}>전체 단어 스탯 보기</Text>
+          <Text style={styles.primaryBtnText}>전체 단어 통계 보기</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.card}>
-        {updateCount > 0 ? (
+        {lastUpdated ? (
           <>
             <Text style={styles.cardText}>전체 단어 갯수 : {updateCount}</Text>
             <Text style={styles.cardSubText}>최신 업데이트 시각 : {lastUpdated}</Text>
@@ -131,6 +141,15 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
           <Text style={styles.cardSubText}>아직 업데이트 기록이 없습니다.</Text>
         )}
       </View>
+
+      {feedback && (
+        <Text
+          accessibilityLiveRegion="polite"
+          style={feedback.tone === "success" ? styles.successText : styles.errorText}
+        >
+          {feedback.text}
+        </Text>
+      )}
 
       <View style={styles.section}>
         <TouchableOpacity
@@ -249,4 +268,16 @@ const styles = StyleSheet.create({
 
   btnDisabled: { opacity: 0.6 },
   textDisabled: { color: "#0f172a" },
+  successText: {
+    width: "80%",
+    maxWidth: 420,
+    color: "#166534",
+    textAlign: "center",
+  },
+  errorText: {
+    width: "80%",
+    maxWidth: 420,
+    color: "#b91c1c",
+    textAlign: "center",
+  },
 });

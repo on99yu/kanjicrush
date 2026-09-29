@@ -1,6 +1,5 @@
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Ionicons } from "@expo/vector-icons"; 
-import {BookOpen, BarChart2, Home, BrainCircuit} from 'lucide-react-native';
+import { BookOpen, Home, BrainCircuit } from "lucide-react-native";
 import WordScreen from "../screens/WordScreen";
 import HomeScreen from "../screens/HomeScreen";
 import WordTestScreen from "../screens/WordTestScreen";
