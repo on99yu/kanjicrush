@@ -5,13 +5,15 @@ import { WordContext } from "../context/WordContext";
 import { WordStatContext } from "../context/WordStatContext";
 import { isKnownWord } from "../utils/isKnownWord";
 import { getAccuracy } from "../utils/CalAccuracy";
-import { Settings } from "lucide-react-native";
+import { LogOut, Settings } from "lucide-react-native";
+import { AuthContext } from "../context/AuthContext";
 
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   const { words, loading: wordLoading } = useContext(WordContext);
   const { statsMap, loading: statLoading } = useContext(WordStatContext)
+  const { session, logout } = useContext(AuthContext);
   const summary = useMemo(() => {
     const totalWords = words.length;
 
@@ -45,6 +47,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   return (
     <View style={styles.container}>
+      <TouchableOpacity
+        accessibilityLabel="로그아웃"
+        onPress={logout}
+        style={styles.logoutButton}
+      >
+        <LogOut size={20} color="#64748b" />
+        <Text style={styles.logoutText}>{session?.user.name} · 로그아웃</Text>
+      </TouchableOpacity>
       <Text style={styles.title}>Kanji Crush</Text>
       <View style={styles.progressCard}>
         <View style={{ alignItems: "flex-start", paddingHorizontal: 16, }}>
@@ -152,5 +162,18 @@ const styles = StyleSheet.create({
   buttonText: {
     color: "black",
     fontSize: 16,
+  },
+  logoutButton: {
+    position: "absolute",
+    top: 16,
+    right: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    padding: 8,
+  },
+  logoutText: {
+    color: "#64748b",
+    fontSize: 13,
   },
 });

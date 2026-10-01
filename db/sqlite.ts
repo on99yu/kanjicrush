@@ -1,5 +1,5 @@
 import * as SQLite from "expo-sqlite";
-import { KanjiTableRow } from "../types/word";
+import { KanjiTableRow, PendingStudyAttempt, WordStatRow } from "../types/word";
 
 let dbInstance: SQLite.SQLiteDatabase | null = null;
 
@@ -63,11 +63,145 @@ export const createTable = async (db: SQLite.SQLiteDatabase) => {
     ON WordStats(lastAnsweredAt);
   `);
 
+  await db.execAsync(`
+    CREATE TABLE IF NOT EXISTS PendingStudyAttempt (
+      clientEventId TEXT PRIMARY KEY,
+      wordId INTEGER NOT NULL,
+      isCorrect INTEGER NOT NULL,
+      answeredAt TEXT NOT NULL,
+      createdAt TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (wordId) REFERENCES KanjiWord(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS AppMeta (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
+  `);
+
+  const progressVersion = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM AppMeta WHERE key = 'progressStorageVersion'"
+  );
+  if (progressVersion?.value !== "cloud-v1") {
+    await db.withTransactionAsync(async () => {
+      await db.execAsync(`
+        DELETE FROM PendingStudyAttempt;
+        DELETE FROM WordStats;
+      `);
+      await db.runAsync(
+        `INSERT INTO AppMeta (key, value) VALUES ('progressStorageVersion', 'cloud-v1')
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`
+      );
+    });
+  }
+
   // 이전 버전에서 모든 단어에 생성했던 빈 통계 행을 정리한다.
   await db.runAsync(`
     DELETE FROM WordStats
     WHERE correctCount = 0 AND wrongCount = 0 AND lastAnsweredAt IS NULL
   `);
+};
+
+export const prepareProgressForUser = async (userId: number) => {
+  const db = await getDBConnection();
+  const activeUser = await db.getFirstAsync<{ value: string }>(
+    "SELECT value FROM AppMeta WHERE key = 'activeProgressUserId'"
+  );
+
+  if (activeUser?.value === String(userId)) return;
+
+  await db.withTransactionAsync(async () => {
+    await db.execAsync(`
+      DELETE FROM PendingStudyAttempt;
+      DELETE FROM WordStats;
+    `);
+    await db.runAsync(
+      `INSERT INTO AppMeta (key, value) VALUES ('activeProgressUserId', ?)
+       ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      [String(userId)]
+    );
+  });
+};
+
+export const recordStudyAttempt = async (
+  attempt: PendingStudyAttempt
+): Promise<WordStatRow> => {
+  const db = await getDBConnection();
+  const answeredAt = new Date(attempt.answeredAt).getTime();
+
+  await db.withTransactionAsync(async () => {
+    await db.runAsync(
+      `INSERT INTO PendingStudyAttempt (clientEventId, wordId, isCorrect, answeredAt)
+       VALUES (?, ?, ?, ?)`,
+      [attempt.clientEventId, attempt.wordId, attempt.isCorrect ? 1 : 0, attempt.answeredAt]
+    );
+
+    await db.runAsync(
+      `INSERT INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(wordId) DO UPDATE SET
+         correctCount = WordStats.correctCount + excluded.correctCount,
+         wrongCount = WordStats.wrongCount + excluded.wrongCount,
+         lastAnsweredAt = excluded.lastAnsweredAt,
+         updatedAt = datetime('now')`,
+      [attempt.wordId, attempt.isCorrect ? 1 : 0, attempt.isCorrect ? 0 : 1, answeredAt]
+    );
+  });
+
+  const updated = await db.getFirstAsync<WordStatRow>(
+    "SELECT * FROM WordStats WHERE wordId = ?",
+    [attempt.wordId]
+  );
+  if (!updated) throw new Error("학습 기록을 저장하지 못했습니다.");
+  return { ...updated, lastResult: attempt.isCorrect };
+};
+
+export const getPendingStudyAttempts = async (): Promise<PendingStudyAttempt[]> => {
+  const db = await getDBConnection();
+  const rows = await db.getAllAsync<{
+    clientEventId: string;
+    wordId: number;
+    isCorrect: number;
+    answeredAt: string;
+  }>("SELECT clientEventId, wordId, isCorrect, answeredAt FROM PendingStudyAttempt ORDER BY createdAt ASC");
+
+  return rows.map((row) => ({
+    ...row,
+    isCorrect: row.isCorrect === 1,
+  }));
+};
+
+export const replaceProgress = async (progress: WordStatRow[]) => {
+  const db = await getDBConnection();
+  await db.withTransactionAsync(async () => {
+    await db.execAsync("DELETE FROM WordStats;");
+    const statement = await db.prepareAsync(
+      `INSERT INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt, updatedAt)
+       VALUES (?, ?, ?, ?, datetime('now'))`
+    );
+    try {
+      for (const item of progress) {
+        await statement.executeAsync([
+          item.wordId,
+          item.correctCount,
+          item.wrongCount,
+          item.lastAnsweredAt,
+        ]);
+      }
+    } finally {
+      await statement.finalizeAsync();
+    }
+  });
+};
+
+export const removePendingStudyAttempts = async (clientEventIds: string[]) => {
+  if (clientEventIds.length === 0) return;
+  const db = await getDBConnection();
+  const placeholders = clientEventIds.map(() => "?").join(",");
+  await db.runAsync(
+    `DELETE FROM PendingStudyAttempt WHERE clientEventId IN (${placeholders})`,
+    clientEventIds
+  );
 };
 
 export const initializeDatabase = async () => {

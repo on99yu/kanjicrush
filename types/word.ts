@@ -39,9 +39,17 @@ export interface WordStatRow{
   wordId: number;
   correctCount: number;
   wrongCount: number;
+  lastResult?: boolean | null;
   lastAnsweredAt: number | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PendingStudyAttempt {
+  clientEventId: string;
+  wordId: number;
+  isCorrect: boolean;
+  answeredAt: string;
 }
 
 // export const getAccuracy = (stats?: WordStatRow) =>{

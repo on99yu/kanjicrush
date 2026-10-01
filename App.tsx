@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useContext, useEffect, useState } from "react";
 import { ActivityIndicator, StyleSheet, Text, View } from "react-native";
 import { NavigationContainer } from "@react-navigation/native";
 import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
@@ -6,6 +6,36 @@ import RootStackNavigator from "./navigation/RootStackNavigator";
 import { initializeDatabase } from "./db/sqlite";
 import { WordProvider } from "./context/WordContext";
 import { WordStatProvider } from "./context/WordStatContext";
+import { AuthContext, AuthProvider } from "./context/AuthContext";
+import LoginScreen from "./screens/LoginScreen";
+
+function AppContent() {
+  const { session, loading } = useContext(AuthContext);
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6366f1" />
+        <Text style={styles.loadingText}>로그인 정보를 확인하고 있습니다.</Text>
+      </View>
+    );
+  }
+
+  if (!session) return <LoginScreen />;
+
+  return (
+    <WordProvider>
+      <WordStatProvider>
+        <NavigationContainer>
+          <SafeAreaView style={{ flex: 1 }}>
+            <RootStackNavigator />
+          </SafeAreaView>
+        </NavigationContainer>
+      </WordStatProvider>
+    </WordProvider>
+  );
+}
+
 export default function App() {
   const [dbReady, setDbReady] = useState(false);
   const [dbError, setDbError] = useState(false);
@@ -45,15 +75,9 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <WordProvider>
-        <WordStatProvider>
-          <NavigationContainer>
-            <SafeAreaView style={{ flex: 1 }}>
-              <RootStackNavigator />
-            </SafeAreaView>
-          </NavigationContainer>
-        </WordStatProvider>
-      </WordProvider>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
     </SafeAreaProvider>
   );
 }

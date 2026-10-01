@@ -1,8 +1,6 @@
 import axios from "axios";
 import { KanjiTableRow } from "../types/word";
-
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ?? "https://kanjicruch-admin.vercel.app";
+import { API_BASE_URL } from "./config";
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
