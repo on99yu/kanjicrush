@@ -39,3 +39,10 @@ export async function uploadProgress(
   );
   return toWordStats(response.data.progress);
 }
+
+export async function deleteProgress(token: string) {
+  await axios.delete(`${API_BASE_URL}/api/app/progress`, {
+    timeout: 30_000,
+    headers: headers(token),
+  });
+}

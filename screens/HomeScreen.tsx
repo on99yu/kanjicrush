@@ -7,6 +7,7 @@ import { isKnownWord } from "../utils/isKnownWord";
 import { getAccuracy } from "../utils/CalAccuracy";
 import { LogOut, Settings } from "lucide-react-native";
 import { AuthContext } from "../context/AuthContext";
+import { countStudiedToday, DAILY_STUDY_TARGET } from "../utils/buildDailyStudyPlan";
 
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
@@ -31,7 +32,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           studiedCount
         );
 
-    return { totalWords, studiedCount, knownCount, accuracy };
+    const studiedToday = countStudiedToday(statsMap);
+
+    return { totalWords, studiedCount, knownCount, accuracy, studiedToday };
   }, [words, statsMap]);
 
   const loading = wordLoading || statLoading;
@@ -60,6 +63,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <View style={{ alignItems: "flex-start", paddingHorizontal: 16, }}>
           <Text style={{ fontSize: 20, color: "#fff" }}>학습 진척도</Text>
         </View>
+        <View style={styles.todayProgress}>
+          <Text style={styles.todayProgressLabel}>오늘의 학습</Text>
+          <Text style={styles.todayProgressValue}>
+            {Math.min(summary.studiedToday, DAILY_STUDY_TARGET)} / {DAILY_STUDY_TARGET}
+          </Text>
+        </View>
         <View style={styles.progressBlock}>
           <View style={styles.DetailBlock}>
             <Text style={{ color: "#fff", fontSize: 12 }}>외운 단어 수</Text>
@@ -76,6 +85,16 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           </View>
         </View>
       </View>
+      <TouchableOpacity
+        style={styles.TodayStudyButton}
+        onPress={() => navigation.navigate("WordTest")}
+      >
+        <Text style={styles.TodayStudyButtonText}>
+          {summary.studiedToday >= DAILY_STUDY_TARGET
+            ? "오늘 학습 완료 ✓"
+            : "오늘 학습 시작"}
+        </Text>
+      </TouchableOpacity>
       <TouchableOpacity
         style={styles.WordStudybutton}
         onPress={() => navigation.navigate("Word")}
@@ -122,6 +141,21 @@ const styles = StyleSheet.create({
     gap: 25,
 
   },
+  todayProgress: {
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  todayProgressLabel: {
+    color: "#e0e7ff",
+    fontSize: 14,
+  },
+  todayProgressValue: {
+    color: "#fff",
+    fontSize: 18,
+    fontWeight: "700",
+  },
   DetailBlock: {
     paddingVertical: 14,
     paddingHorizontal: 12,
@@ -143,6 +177,19 @@ const styles = StyleSheet.create({
     borderColor: "#15803d",
     borderWidth: 1
 
+  },
+  TodayStudyButton: {
+    minWidth: 210,
+    paddingVertical: 15,
+    paddingHorizontal: 24,
+    borderRadius: 12,
+    backgroundColor: "#4f46e5",
+    alignItems: "center",
+  },
+  TodayStudyButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "700",
   },
   WordManagerbutton: {
     alignContent: "center",

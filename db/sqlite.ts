@@ -204,6 +204,16 @@ export const removePendingStudyAttempts = async (clientEventIds: string[]) => {
   );
 };
 
+export const clearAllProgress = async () => {
+  const db = await getDBConnection();
+  await db.withTransactionAsync(async () => {
+    await db.execAsync(`
+      DELETE FROM PendingStudyAttempt;
+      DELETE FROM WordStats;
+    `);
+  });
+};
+
 export const initializeDatabase = async () => {
   const db = await getDBConnection();
   await createTable(db);

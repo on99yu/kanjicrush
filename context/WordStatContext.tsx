@@ -4,6 +4,7 @@ import * as Crypto from "expo-crypto";
 import {
     getDBConnection,
     getPendingStudyAttempts,
+    clearAllProgress,
     prepareProgressForUser,
     recordStudyAttempt,
     removePendingStudyAttempts,
@@ -11,7 +12,7 @@ import {
 } from "../db/sqlite";
 import { WordStatRow } from "../types/word";
 import { AuthContext } from "./AuthContext";
-import { fetchProgress, uploadProgress } from "../api/progressApi";
+import { deleteProgress, fetchProgress, uploadProgress } from "../api/progressApi";
 
 type WordStatContextType = {
     statsMap: Record<number, WordStatRow>;
@@ -21,6 +22,7 @@ type WordStatContextType = {
         wordId: number,
         isCorrect: boolean
     ) => Promise<void>;
+    resetAllProgress: () => Promise<void>;
 };
 
 export const WordStatContext = createContext<WordStatContextType>({
@@ -28,6 +30,7 @@ export const WordStatContext = createContext<WordStatContextType>({
     loading: true,
     refreshStats: async () => { },
     updateProgress: async () => { },
+    resetAllProgress: async () => { },
 })
 
 
@@ -156,12 +159,25 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
         }
     }, [syncStats, loadLocalStats]);
 
+    const resetAllProgress = useCallback(async () => {
+        if (!session) throw new Error("로그인이 필요합니다.");
+
+        if (syncInFlight.current) {
+            await syncInFlight.current;
+        }
+
+        await deleteProgress(session.token);
+        await clearAllProgress();
+        setStatsMap({});
+    }, [session]);
+
     const value = useMemo(() => ({
         statsMap,
         loading,
         refreshStats,
         updateProgress,
-    }), [statsMap, loading, refreshStats, updateProgress])
+        resetAllProgress,
+    }), [statsMap, loading, refreshStats, updateProgress, resetAllProgress])
 
     return (
         <WordStatContext.Provider value={value}>

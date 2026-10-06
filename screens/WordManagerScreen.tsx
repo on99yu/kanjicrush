@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from "react-native";
 import { fetchKanjiData } from "../api/kanjiApi";
 import { useContext, useState, useEffect, } from "react";
 import { deleteAllWords, getDBConnection, syncWords } from "../db/sqlite";
@@ -16,7 +16,7 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
     text: string;
   } | null>(null);
   const { refreshWords } = useContext(WordContext);
-  const { refreshStats } = useContext(WordStatContext);
+  const { refreshStats, resetAllProgress } = useContext(WordStatContext);
 
   useEffect(() => {
     const loadLastUpdate = async () => {
@@ -108,9 +108,42 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
     );
   };
 
+  const handleResetProgress = () => {
+    Alert.alert(
+      "학습 기록 초기화",
+      "현재 계정의 정답, 오답, 학습률이 모든 기기에서 삭제됩니다. 단어장은 유지되며 이 작업은 되돌릴 수 없습니다.",
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "초기화",
+          style: "destructive",
+          onPress: async () => {
+            setLoading(true);
+            setFeedback(null);
+            try {
+              await resetAllProgress();
+              setFeedback({
+                tone: "success",
+                text: "학습 기록을 초기화했습니다. 단어장은 그대로 유지됩니다.",
+              });
+            } catch (error) {
+              console.error("학습 기록 초기화 실패:", error);
+              setFeedback({
+                tone: "error",
+                text: "학습 기록을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.",
+              });
+            } finally {
+              setLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
 
   return (
-    <View style={styles.container}>
+    <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>단어장 관리</Text>
 
       <View style={styles.section}>
@@ -163,6 +196,14 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
         </TouchableOpacity>
 
         <TouchableOpacity
+          style={[styles.resetProgressBtn, loading && styles.btnDisabled]}
+          onPress={handleResetProgress}
+          disabled={loading}
+        >
+          <Text style={styles.resetProgressBtnText}>학습 기록 초기화</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
           style={[styles.dangerBtn, loading && styles.btnDisabled]}
           onPress={handleDeleteAllWords}
           disabled={loading}
@@ -178,7 +219,7 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
           <Text style={styles.ghostBtnText}>홈으로</Text>
         </TouchableOpacity>
       </View>
-    </View>
+    </ScrollView>
   );
 }
 
@@ -255,6 +296,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   dangerBtnText: { color: "#fff", fontSize: 16, fontWeight: "700" },
+
+  resetProgressBtn: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 14,
+    backgroundColor: "#fff7ed",
+    borderWidth: 1,
+    borderColor: "#f97316",
+    alignItems: "center",
+  },
+  resetProgressBtnText: { color: "#c2410c", fontSize: 16, fontWeight: "700" },
 
   ghostBtn: {
     width: "100%",

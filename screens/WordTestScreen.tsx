@@ -1,42 +1,46 @@
-import React, { useState, useEffect, useContext, useCallback } from "react";
+import React, { useState, useEffect, useContext, useCallback, useRef } from "react";
 import { ActivityIndicator, Alert, View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { WordContext } from "../context/WordContext";
 import WordTestCard from "../components/WordTestCard";
 import { Check, Eye, X } from "lucide-react-native";
 import { WordStatContext } from "../context/WordStatContext";
 import { KanjiTableRow } from "../types/word";
-import { shuffleArray } from "../utils/shuffleArray";
-
-const DAILY_LIMIT = 100;
+import {
+  buildDailyStudyPlan,
+  DailyStudyPlan,
+  DAILY_STUDY_TARGET,
+} from "../utils/buildDailyStudyPlan";
 
 export default function WordTestScreen() {
   const { words, loading } = useContext(WordContext);
-  const { updateProgress } = useContext(WordStatContext);
+  const { statsMap, loading: statLoading, updateProgress } = useContext(WordStatContext);
 
   const [testWords, setTestWords] = useState<KanjiTableRow[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [showAnswer, setShowAnswer] = useState(false);
   const [results, setResults] = useState<(null | "correct" | "wrong")[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [plan, setPlan] = useState<DailyStudyPlan | null>(null);
+  const initialized = useRef(false);
 
   const startQuiz = useCallback(() => {
-    const selected = shuffleArray(words).slice(0, DAILY_LIMIT);
-    setTestWords(selected);
+    const nextPlan = buildDailyStudyPlan(words, statsMap);
+    setPlan(nextPlan);
+    setTestWords(nextPlan.words);
     setCurrentIndex(0);
     setShowAnswer(false);
-    setResults(new Array(selected.length).fill(null));
+    setResults(new Array(nextPlan.words.length).fill(null));
     setSubmitting(false);
-  }, [words]);
+  }, [words, statsMap]);
 
   useEffect(() => {
-    if (words.length > 0) {
+    if (!loading && !statLoading && words.length > 0 && !initialized.current) {
+      initialized.current = true;
       startQuiz();
-    } else {
-      setTestWords([]);
     }
-  }, [words, startQuiz]);
+  }, [words, loading, statLoading, startQuiz]);
 
-  if (loading) {
+  if (loading || statLoading || !plan) {
     return (
       <View style={styles.emptyContainer}>
         <ActivityIndicator size="large" color="#6366f1" />
@@ -46,6 +50,18 @@ export default function WordTestScreen() {
   }
 
   if (testWords.length === 0) {
+    if (plan.completedToday >= DAILY_STUDY_TARGET) {
+      return (
+        <View style={styles.emptyContainer}>
+          <Text style={styles.completionEmoji}>🎉</Text>
+          <Text style={styles.emptyTitle}>오늘 학습 완료</Text>
+          <Text style={styles.emptyDescription}>
+            오늘 목표 {DAILY_STUDY_TARGET}개를 모두 학습했습니다.
+          </Text>
+        </View>
+      );
+    }
+
     return (
       <View style={styles.emptyContainer}>
         <Text style={styles.emptyTitle}>퀴즈에 사용할 단어가 없습니다.</Text>
@@ -107,7 +123,7 @@ export default function WordTestScreen() {
       <View style={styles.progressWrapper}>
         <View style={styles.progressHeader}>
           <Text style={styles.progressLabel}>
-            랜덤 단어 퀴즈
+            오늘의 학습 · 새 단어 {plan.newCount} · 복습 {plan.reviewCount + plan.knownCount}
           </Text>
           <Text style={styles.progressCount}>
             {currentIndex + 1} / {total}
@@ -151,13 +167,15 @@ export default function WordTestScreen() {
 
         {isComplete && (
           <View style={styles.summaryBox}>
-            <Text style={styles.summaryText}>오늘 학습 완료 🎉</Text>
+            <Text style={styles.summaryText}>
+              이번 학습 완료 🎉
+            </Text>
             <Text style={styles.summaryText}>
               정답: {correctCount} / 오답: {wrongCount}
             </Text>
-            <TouchableOpacity onPress={startQuiz} style={styles.restartButton}>
-              <Text style={styles.restartButtonText}>새 퀴즈 시작</Text>
-            </TouchableOpacity>
+            <Text style={styles.summaryDescription}>
+              홈으로 돌아가면 오늘의 진척도를 확인할 수 있습니다.
+            </Text>
           </View>
         )}
       </View>
@@ -183,6 +201,9 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#64748b",
     textAlign: "center",
+  },
+  completionEmoji: {
+    fontSize: 48,
   },
   container: {
     flex: 1,
@@ -274,16 +295,9 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#374151",
   },
-  restartButton: {
-    marginTop: 16,
-    borderRadius: 9999,
-    backgroundColor: "#4f46e5",
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-  },
-  restartButtonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
+  summaryDescription: {
+    marginTop: 8,
+    color: "#64748b",
+    textAlign: "center",
   },
 });
