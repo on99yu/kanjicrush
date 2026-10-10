@@ -103,6 +103,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       </TouchableOpacity>
       <TouchableOpacity
         style={styles.WordManagerbutton}
+        onPress={() => navigation.navigate("WholeWordStat")}
+      >
+        <Text style={styles.buttonText}>학습 분석 보기</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.WordManagerbutton}
         onPress={() => navigation.navigate("WordManager")}
       >
         <Settings size={24} color={"#9CA3AF"}></Settings>

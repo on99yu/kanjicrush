@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView } from "react-native";
+import { View, Text, TouchableOpacity, StyleSheet, Alert, ScrollView, Modal } from "react-native";
 import { fetchKanjiData } from "../api/kanjiApi";
 import { useContext, useState, useEffect, } from "react";
 import { deleteAllWords, getDBConnection, syncWords } from "../db/sqlite";
@@ -9,6 +9,8 @@ import { WordStatContext } from "../context/WordStatContext";
 
 export default function WordManagerScreen({ navigation }: WordManagerProps) {
   const [loading, setLoading] = useState(false);
+  const [resetConfirmationVisible, setResetConfirmationVisible] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const [updateCount, setUpdateCount] = useState(0);
   const [lastUpdated, setLastUpdated] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{
@@ -108,41 +110,68 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
     );
   };
 
-  const handleResetProgress = () => {
-    Alert.alert(
-      "학습 기록 초기화",
-      "현재 계정의 정답, 오답, 학습률이 모든 기기에서 삭제됩니다. 단어장은 유지되며 이 작업은 되돌릴 수 없습니다.",
-      [
-        { text: "취소", style: "cancel" },
-        {
-          text: "초기화",
-          style: "destructive",
-          onPress: async () => {
-            setLoading(true);
-            setFeedback(null);
-            try {
-              await resetAllProgress();
-              setFeedback({
-                tone: "success",
-                text: "학습 기록을 초기화했습니다. 단어장은 그대로 유지됩니다.",
-              });
-            } catch (error) {
-              console.error("학습 기록 초기화 실패:", error);
-              setFeedback({
-                tone: "error",
-                text: "학습 기록을 초기화하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-              });
-            } finally {
-              setLoading(false);
-            }
-          },
-        },
-      ]
-    );
+  const handleResetProgress = async () => {
+    if (resetting) return;
+    setResetting(true);
+    setLoading(true);
+    setFeedback(null);
+    try {
+      await resetAllProgress();
+      setFeedback({
+        tone: "success",
+        text: "학습 기록을 초기화했습니다. 단어장은 그대로 유지됩니다.",
+      });
+    } catch {
+      setFeedback({
+        tone: "error",
+        text: "학습 기록을 초기화하지 못했습니다. 연결을 확인하고 다시 시도해 주세요.",
+      });
+    } finally {
+      setResetConfirmationVisible(false);
+      setResetting(false);
+      setLoading(false);
+    }
   };
 
 
   return (
+    <>
+    <Modal
+      visible={resetConfirmationVisible}
+      transparent
+      animationType="fade"
+      onRequestClose={() => {
+        if (!resetting) setResetConfirmationVisible(false);
+      }}
+    >
+      <View style={styles.modalBackdrop}>
+        <View style={styles.modalCard} accessibilityViewIsModal>
+          <Text style={styles.modalTitle}>학습 기록 초기화</Text>
+          <Text style={styles.modalDescription}>
+            현재 계정의 정답, 오답, 학습률이 삭제됩니다. 단어장은 유지됩니다.
+            {"\n\n"}이 작업은 되돌릴 수 없습니다. 다른 기기는 동기화 후 반영됩니다.
+          </Text>
+          <View style={styles.modalActions}>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={() => setResetConfirmationVisible(false)}
+              disabled={resetting}
+              style={[styles.modalButton, styles.cancelButton]}
+            >
+              <Text style={styles.ghostBtnText}>취소</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              accessibilityRole="button"
+              onPress={handleResetProgress}
+              disabled={resetting}
+              style={[styles.dangerBtn, styles.modalButton, resetting && styles.btnDisabled]}
+            >
+              <Text style={styles.dangerBtnText}>{resetting ? "초기화 중..." : "초기화"}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>단어장 관리</Text>
 
@@ -160,7 +189,7 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
           onPress={() => navigation.navigate("WholeWordStat")}
           disabled={loading}
         >
-          <Text style={styles.primaryBtnText}>전체 단어 통계 보기</Text>
+          <Text style={styles.primaryBtnText}>학습 분석 보기</Text>
         </TouchableOpacity>
       </View>
 
@@ -197,7 +226,8 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
 
         <TouchableOpacity
           style={[styles.resetProgressBtn, loading && styles.btnDisabled]}
-          onPress={handleResetProgress}
+          accessibilityRole="button"
+          onPress={() => setResetConfirmationVisible(true)}
           disabled={loading}
         >
           <Text style={styles.resetProgressBtnText}>학습 기록 초기화</Text>
@@ -220,6 +250,7 @@ export default function WordManagerScreen({ navigation }: WordManagerProps) {
         </TouchableOpacity>
       </View>
     </ScrollView>
+    </>
   );
 }
 
@@ -228,7 +259,7 @@ const BG = "#fff";
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     padding: 16,
     paddingTop: 24,
     alignItems: "center",
@@ -242,6 +273,26 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginBottom: 16,
   },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(15, 23, 42, 0.5)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 420,
+    borderRadius: 16,
+    padding: 24,
+    gap: 18,
+    backgroundColor: "#fff",
+  },
+  modalTitle: { fontSize: 20, fontWeight: "700", color: "#111827" },
+  modalDescription: { fontSize: 16, lineHeight: 24, color: "#475569" },
+  modalActions: { flexDirection: "row", gap: 12 },
+  modalButton: { flex: 1, width: undefined, paddingVertical: 14, borderRadius: 12, alignItems: "center" },
+  cancelButton: { backgroundColor: "#eef2ff" },
 
   section: {
     width: "80%",

@@ -1,6 +1,7 @@
 import axios from "axios";
 import { API_BASE_URL } from "./config";
 import { PendingStudyAttempt, WordStatRow } from "../types/word";
+import { StudyHistory } from "../types/studyStats";
 
 type RemoteProgress = {
   wordId: number;
@@ -11,6 +12,14 @@ type RemoteProgress = {
 };
 
 const headers = (token: string) => ({ Authorization: `Bearer ${token}` });
+
+export async function fetchStudyHistory(token: string) {
+  const response = await axios.get<StudyHistory>(`${API_BASE_URL}/api/app/stats`, {
+    timeout: 15_000, headers: headers(token),
+    params: { offset: new Date().getTimezoneOffset() },
+  });
+  return response.data;
+}
 
 const toWordStats = (items: RemoteProgress[]): WordStatRow[] =>
   items.map((item) => ({
