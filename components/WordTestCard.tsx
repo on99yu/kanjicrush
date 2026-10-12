@@ -9,13 +9,14 @@ type Props = {
 export default function WordTestCard({ word, showAnswer }: Props) {
   return (
     <View style={styles.container}>
-      <Text style={styles.word}>{word.word}</Text>
-      {showAnswer && (
-        <>
-          <Text style={styles.reading}>{word.reading}</Text>
+      <Text style={styles.label}>이 단어의 뜻은?</Text>
+      <Text style={[styles.word, { fontSize: word.word.length > 6 ? 34 : 48 }]}>{word.word}</Text>
+      <View style={styles.answer}>
+        {showAnswer ? <>
           <Text style={styles.meaning}>{word.meaning}</Text>
-        </>
-      )}
+          <Text style={styles.reading}>읽기 · {word.reading}</Text>
+        </> : <Text style={styles.hint}>뜻을 먼저 떠올린 뒤 확인하세요.</Text>}
+      </View>
     </View>
   );
 }
@@ -25,7 +26,7 @@ const styles = StyleSheet.create({
     backgroundColor:"#fff",
     padding:24,
     borderRadius:16,
-    width:"90%",
+    width:"100%",
     alignSelf:"center",
     alignItems:"center",
     shadowColor:"#000",
@@ -45,7 +46,13 @@ const styles = StyleSheet.create({
     marginBottom:4,
   },
   meaning: {
-    fontSize:18,
+    fontSize:24,
+    fontWeight:"600",
+    color:"#0f172a",
+    textAlign:"center",
     marginTop:8,
   },
+  label: { color: "#64748b", fontSize: 13, marginBottom: 20, textAlign: "center" },
+  answer: { minHeight: 120, width: "100%", justifyContent: "center", alignItems: "center", gap: 12, paddingTop: 16, borderTopWidth: 1, borderColor: "#e2e8f0" },
+  hint: { color: "#64748b", textAlign: "center", lineHeight: 24 },
 });

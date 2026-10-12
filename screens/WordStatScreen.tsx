@@ -75,7 +75,7 @@ export default function WordStatScreen() {
             <View style={styles.metrics}>
               <View style={styles.metric}><Text style={styles.muted}>누적 학습량</Text><Text style={styles.metricValue}>{totalWords}개</Text><Text style={styles.caption}>일별 단어 수 합계</Text></View>
               <View style={styles.metric}><Text style={styles.muted}>정답률</Text><Text style={styles.metricValue}>{totalAnswers ? `${Math.round(totalCorrect / totalAnswers * 100)}%` : "—"}</Text><Text style={styles.caption}>{totalAnswers}회 평가 기준</Text></View>
-              <View style={styles.metric}><Text style={styles.muted}>목표 달성</Text><Text style={styles.metricValue}>{achievedDays}일</Text><Text style={styles.caption}>{period}일 중 · 하루 {DAILY_STUDY_TARGET}개</Text></View>
+              <View style={styles.metric}><Text style={styles.muted}>50개 학습일</Text><Text style={styles.metricValue}>{achievedDays}일</Text><Text style={styles.caption}>{period}일 중 · 상한 {DAILY_STUDY_TARGET}개</Text></View>
             </View>
             <View style={styles.card}>
               <Text style={styles.sectionTitle}>최근 7일 학습량</Text>
@@ -86,7 +86,7 @@ export default function WordStatScreen() {
                   <Text style={styles.caption}>{day.date.slice(5).replace("-", "/")}</Text>
                 </View>)}
               </View>
-              <Text style={styles.caption}>같은 날 같은 단어는 한 개로 계산합니다. 초록색은 목표 달성일입니다.</Text>
+              <Text style={styles.caption}>같은 날 같은 단어는 한 개로 계산합니다. 초록색은 50개 학습일이며, 50개를 채울 필요는 없습니다.</Text>
             </View>
           </>}
           <View style={styles.card}>

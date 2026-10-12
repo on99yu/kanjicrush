@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { ActivityIndicator, View, StyleSheet, TouchableOpacity, Text } from "react-native";
+import { ActivityIndicator, ScrollView, View, StyleSheet, TouchableOpacity, Text } from "react-native";
 import WordCard from "../components/WordCard";;
 import { useContext } from "react";
 import { WordContext } from "../context/WordContext";
@@ -81,9 +81,9 @@ export default function WordScreen() {
         </Text>
       </View>
 
-      <View style={styles.cardContainer}>
+      <ScrollView style={{ flex: 1, width: '100%' }} contentContainerStyle={styles.cardContainer}>
         <WordCard word={currentWords[currentIndex]} />
-      </View>
+      </ScrollView>
 
       <View style={styles.navButtons}>
         <TouchableOpacity
@@ -160,7 +160,7 @@ const styles = StyleSheet.create({
     alignSelf: "flex-end",
   },
   cardContainer: {
-    flex: 1,
+    flexGrow: 1,
     width: "100%",
     justifyContent: "center",
     paddingBottom: 80,

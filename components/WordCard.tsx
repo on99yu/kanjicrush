@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet } from 'react-native';
+import { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { KanjiTableRow } from '../types/word';
 
 type Props = {
@@ -6,6 +7,8 @@ type Props = {
 };
 
 export default function WordCard({ word }: Props) {
+  const [showDetails, setShowDetails] = useState(false);
+  useEffect(() => setShowDetails(false), [word.id]);
 
   const wordFontSize = word.word.length >= 7 ? 36 : 48;
 
@@ -16,10 +19,11 @@ export default function WordCard({ word }: Props) {
   return (
     <View style={styles.container}>
       <Text style={[styles.word, {fontSize : wordFontSize}]}>{word.word}</Text>
-      <Text style={styles.reading}>{word.reading}</Text>
       <Text style={styles.meaning}>{word.meaning}</Text>
+      <Text style={styles.reading}>읽기 · {word.reading}</Text>
 
-      <View style={styles.kanjiContainer}>
+      {word.kanjiList.length > 0 && <TouchableOpacity onPress={() => setShowDetails((value) => !value)} accessibilityRole="button" accessibilityState={{ expanded: showDetails }} style={{ padding: 16 }}><Text style={{ color: '#4f46e5' }}>한자 음독·훈독 {showDetails ? '접기' : '보기'}</Text></TouchableOpacity>}
+      {showDetails && <View style={styles.kanjiContainer}>
         {word.kanjiList.map((kanji, index) => (
           <View key={index} style={[
               styles.kanjiRow,
@@ -31,11 +35,11 @@ export default function WordCard({ word }: Props) {
             <Text style={[styles.kanjiText, { fontSize: kanjiFontSize }]}>
               {kanji.kanji}
             </Text>
-            <Text style={styles.readingText}>음독: {kanji.onyomi}</Text>
-            <Text style={styles.readingText}>훈독: {kanji.kunyomi}</Text>
+            {!!kanji.onyomi && <Text style={styles.readingText}>음독: {kanji.onyomi}</Text>}
+            {!!kanji.kunyomi && <Text style={styles.readingText}>훈독: {kanji.kunyomi}</Text>}
           </View>
         ))}
-      </View>
+      </View>}
     </View>
   );
 }
@@ -65,7 +69,9 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   meaning: {
-    fontSize: 18,
+    fontSize: 24,
+    fontWeight: '600',
+    textAlign: 'center',
     marginBottom: 16,
   },
   kanjiContainer: {

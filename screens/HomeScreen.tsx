@@ -1,5 +1,6 @@
-import React, { useContext, useMemo } from "react";
-import { ActivityIndicator, View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import React, { useContext, useMemo, useState, useCallback } from "react";
+import { ActivityIndicator, ScrollView, View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
 import { HomeScreenProps } from "../types/screen";
 import { WordContext } from "../context/WordContext";
 import { WordStatContext } from "../context/WordStatContext";
@@ -7,7 +8,7 @@ import { isKnownWord } from "../utils/isKnownWord";
 import { getAccuracy } from "../utils/CalAccuracy";
 import { LogOut, Settings } from "lucide-react-native";
 import { AuthContext } from "../context/AuthContext";
-import { countStudiedToday, DAILY_STUDY_TARGET } from "../utils/buildDailyStudyPlan";
+import { buildDailyStudyPlan } from "../utils/buildDailyStudyPlan";
 
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
@@ -15,6 +16,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const { words, loading: wordLoading } = useContext(WordContext);
   const { statsMap, loading: statLoading } = useContext(WordStatContext)
   const { session, logout } = useContext(AuthContext);
+  const [today, setToday] = useState(new Date());
+  useFocusEffect(useCallback(() => {
+    setToday(new Date());
+    const timer = setInterval(() => setToday(new Date()), 60_000);
+    return () => clearInterval(timer);
+  }, []));
+  const plan = useMemo(() => buildDailyStudyPlan(words, statsMap, today), [words, statsMap, today]);
   const summary = useMemo(() => {
     const totalWords = words.length;
 
@@ -32,9 +40,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           studiedCount
         );
 
-    const studiedToday = countStudiedToday(statsMap);
-
-    return { totalWords, studiedCount, knownCount, accuracy, studiedToday };
+    return { totalWords, studiedCount, knownCount, accuracy };
   }, [words, statsMap]);
 
   const loading = wordLoading || statLoading;
@@ -49,7 +55,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   }
 
   return (
-    <View style={styles.container}>
+    <ScrollView style={{ flex: 1, backgroundColor: "#fff" }} contentContainerStyle={styles.container}>
       <TouchableOpacity
         accessibilityLabel="로그아웃"
         onPress={logout}
@@ -64,11 +70,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           <Text style={{ fontSize: 20, color: "#fff" }}>학습 진척도</Text>
         </View>
         <View style={styles.todayProgress}>
-          <Text style={styles.todayProgressLabel}>오늘의 학습</Text>
+          <Text style={styles.todayProgressLabel}>오늘 예정 학습</Text>
           <Text style={styles.todayProgressValue}>
-            {Math.min(summary.studiedToday, DAILY_STUDY_TARGET)} / {DAILY_STUDY_TARGET}
+            {plan.completedToday} / {plan.completedToday + plan.remainingToday}
           </Text>
         </View>
+        <Text style={{ color: "#e0e7ff", paddingHorizontal: 16, fontSize: 12 }}>남은 복습 {plan.reviewCount + plan.knownCount} · 새 단어 {plan.newCount}{"\n"}새 단어 하루 최대 10개 · 복습 포함 최대 50개</Text>
         <View style={styles.progressBlock}>
           <View style={styles.DetailBlock}>
             <Text style={{ color: "#fff", fontSize: 12 }}>외운 단어 수</Text>
@@ -90,7 +97,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         onPress={() => navigation.navigate("WordTest")}
       >
         <Text style={styles.TodayStudyButtonText}>
-          {summary.studiedToday >= DAILY_STUDY_TARGET
+          {words.length > 0 && plan.remainingToday === 0
             ? "오늘 학습 완료 ✓"
             : "오늘 학습 시작"}
         </Text>
@@ -114,17 +121,19 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <Settings size={24} color={"#9CA3AF"}></Settings>
         <Text style={styles.buttonText}>단어장 관리</Text>
       </TouchableOpacity>
-    </View>
+    </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
+    flexGrow: 1,
     justifyContent: "center",
     alignItems: "center",
     gap: 24,
     paddingHorizontal: 20,
+    paddingTop: 72,
+    paddingBottom: 24,
     backgroundColor: "#fff",
   },
   title: {

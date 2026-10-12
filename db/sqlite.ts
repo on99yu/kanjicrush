@@ -63,6 +63,11 @@ export const createTable = async (db: SQLite.SQLiteDatabase) => {
     ON WordStats(lastAnsweredAt);
   `);
 
+  const statColumns = await db.getAllAsync<{ name: string }>("PRAGMA table_info(WordStats)");
+  if (!statColumns.some((column) => column.name === "lastResult")) {
+    await db.execAsync("ALTER TABLE WordStats ADD COLUMN lastResult INTEGER;");
+  }
+
   await db.execAsync(`
     CREATE TABLE IF NOT EXISTS PendingStudyAttempt (
       clientEventId TEXT PRIMARY KEY,
@@ -137,14 +142,15 @@ export const recordStudyAttempt = async (
     );
 
     await db.runAsync(
-      `INSERT INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt)
-       VALUES (?, ?, ?, ?)
+      `INSERT INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt, lastResult)
+       VALUES (?, ?, ?, ?, ?)
        ON CONFLICT(wordId) DO UPDATE SET
          correctCount = WordStats.correctCount + excluded.correctCount,
          wrongCount = WordStats.wrongCount + excluded.wrongCount,
          lastAnsweredAt = excluded.lastAnsweredAt,
+         lastResult = excluded.lastResult,
          updatedAt = datetime('now')`,
-      [attempt.wordId, attempt.isCorrect ? 1 : 0, attempt.isCorrect ? 0 : 1, answeredAt]
+      [attempt.wordId, attempt.isCorrect ? 1 : 0, attempt.isCorrect ? 0 : 1, answeredAt, attempt.isCorrect ? 1 : 0]
     );
   });
 
@@ -176,8 +182,8 @@ export const replaceProgress = async (progress: WordStatRow[]) => {
   await db.withTransactionAsync(async () => {
     await db.execAsync("DELETE FROM WordStats;");
     const statement = await db.prepareAsync(
-      `INSERT INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt, updatedAt)
-       VALUES (?, ?, ?, ?, datetime('now'))`
+      `INSERT INTO WordStats (wordId, correctCount, wrongCount, lastAnsweredAt, lastResult, updatedAt)
+       VALUES (?, ?, ?, ?, ?, datetime('now'))`
     );
     try {
       for (const item of progress) {
@@ -186,6 +192,7 @@ export const replaceProgress = async (progress: WordStatRow[]) => {
           item.correctCount,
           item.wrongCount,
           item.lastAnsweredAt,
+          item.lastResult == null ? null : item.lastResult ? 1 : 0,
         ]);
       }
     } finally {

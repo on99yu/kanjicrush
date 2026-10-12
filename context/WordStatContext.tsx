@@ -15,6 +15,7 @@ import { AuthContext } from "./AuthContext";
 import { deleteProgress, fetchProgress, uploadProgress } from "../api/progressApi";
 
 type WordStatContextType = {
+    resetVersion: number;
     statsMap: Record<number, WordStatRow>;
     loading: boolean;
     refreshStats: () => Promise<void>;
@@ -26,6 +27,7 @@ type WordStatContextType = {
 };
 
 export const WordStatContext = createContext<WordStatContextType>({
+    resetVersion: 0,
     statsMap: {},
     loading: true,
     refreshStats: async () => { },
@@ -38,6 +40,7 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
     const { session } = useContext(AuthContext);
     const [statsMap, setStatsMap] = useState<Record<number, WordStatRow>>({});
     const [loading, setLoading] = useState(true);
+    const [resetVersion, setResetVersion] = useState(0);
     const syncInFlight = useRef<Promise<void> | null>(null);
     const syncAgain = useRef(false);
 
@@ -53,6 +56,7 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
                     wordId: r.wordId,
                     correctCount: r.correctCount ?? 0,
                     wrongCount: r.wrongCount ?? 0,
+                    lastResult: r.lastResult == null ? null : r.lastResult === 1,
                     lastAnsweredAt: r.lastAnsweredAt ?? null,
                     createdAt: r.createdAt,
                     updatedAt: r.updatedAt,
@@ -84,6 +88,11 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
             remoteStats = await fetchProgress(session.token);
         }
 
+        // 응답 대기 중 새로 저장한 답변을 이전 서버 응답으로 덮어쓰지 않는다.
+        if ((await getPendingStudyAttempts()).length > 0) {
+            syncAgain.current = true;
+            return;
+        }
         await replaceProgress(remoteStats);
         const map: Record<number, WordStatRow> = {};
         for (const stat of remoteStats) map[stat.wordId] = stat;
@@ -169,15 +178,17 @@ export const WordStatProvider = ({ children }: { children: ReactNode; }) => {
         await deleteProgress(session.token);
         await clearAllProgress();
         setStatsMap({});
+        setResetVersion((version) => version + 1);
     }, [session]);
 
     const value = useMemo(() => ({
+        resetVersion,
         statsMap,
         loading,
         refreshStats,
         updateProgress,
         resetAllProgress,
-    }), [statsMap, loading, refreshStats, updateProgress, resetAllProgress])
+    }), [resetVersion, statsMap, loading, refreshStats, updateProgress, resetAllProgress])
 
     return (
         <WordStatContext.Provider value={value}>

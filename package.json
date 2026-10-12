@@ -11,7 +11,8 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit --incremental false",
-    "doctor": "expo-doctor"
+    "doctor": "expo-doctor",
+    "test:study": "node --test tests/studyPlan.test.cjs"
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",

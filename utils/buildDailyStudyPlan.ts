@@ -4,8 +4,8 @@ import { isKnownWord } from "./isKnownWord";
 import { shuffleArray } from "./shuffleArray";
 
 export const DAILY_STUDY_TARGET = 50;
-export const DAILY_NEW_WORD_TARGET = 15;
-const KNOWN_WORD_DAILY_LIMIT = 3;
+export const DAILY_NEW_WORD_TARGET = 10;
+export const STUDY_BATCH_SIZE = 10;
 
 export type DailyStudyPlan = {
   words: KanjiTableRow[];
@@ -16,104 +16,56 @@ export type DailyStudyPlan = {
   knownCount: number;
 };
 
-const startOfToday = () => {
-  const date = new Date();
-  date.setHours(0, 0, 0, 0);
-  return date.getTime();
-};
+export function studyDayKey(now = new Date()) {
+  return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
+}
 
-export const countStudiedToday = (statsMap: Record<number, WordStatRow>) => {
-  const today = startOfToday();
-  return Object.values(statsMap).filter(
-    (stats) => (stats.lastAnsweredAt ?? 0) >= today
-  ).length;
-};
+export function countStudiedToday(statsMap: Record<number, WordStatRow>, now = new Date()) {
+  return Object.values(statsMap).filter((stats) => stats.lastAnsweredAt !== null &&
+    studyDayKey(new Date(stats.lastAnsweredAt)) === studyDayKey(now)).length;
+}
 
-const compareReviewPriority = (a: WordStatRow, b: WordStatRow) => {
-  const accuracyDifference = getAccuracy(a) - getAccuracy(b);
-  if (accuracyDifference !== 0) return accuracyDifference;
+export function reviewIntervalDays(stats: WordStatRow) {
+  // 최근에 모른다고 평가하면 누적 정답 수와 관계없이 다음 날 다시 확인한다.
+  if (stats.lastResult === false || stats.correctCount === 0) return 1;
+  if (isKnownWord(stats)) return 14;
+  if (stats.correctCount >= 3 && getAccuracy(stats) >= 70) return 7;
+  if (stats.correctCount >= 2 && getAccuracy(stats) >= 60) return 3;
+  return 1;
+}
 
-  const wrongDifference = b.wrongCount - a.wrongCount;
-  if (wrongDifference !== 0) return wrongDifference;
+function calendarDayNumber(timestamp: number) {
+  const date = new Date(timestamp);
+  return Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()) / 86_400_000;
+}
 
-  return (a.lastAnsweredAt ?? 0) - (b.lastAnsweredAt ?? 0);
-};
-
-export function buildDailyStudyPlan(
-  words: KanjiTableRow[],
-  statsMap: Record<number, WordStatRow>
-): DailyStudyPlan {
-  const completedToday = countStudiedToday(statsMap);
-  const remainingToday = Math.max(0, DAILY_STUDY_TARGET - completedToday);
-  const today = startOfToday();
-
-  if (remainingToday === 0) {
-    return {
-      words: [],
-      completedToday,
-      remainingToday,
-      newCount: 0,
-      reviewCount: 0,
-      knownCount: 0,
-    };
-  }
-
-  const availableWords = words.filter(
-    (word) => (statsMap[word.id]?.lastAnsweredAt ?? 0) < today
-  );
-  const newWords = shuffleArray(
-    availableWords.filter((word) => !statsMap[word.id])
-  );
-  const reviewWords = availableWords
-    .filter((word) => statsMap[word.id] && !isKnownWord(statsMap[word.id]))
-    .sort((a, b) =>
-      compareReviewPriority(statsMap[a.id], statsMap[b.id])
-    );
-  const knownWords = shuffleArray(
-    availableWords.filter((word) => isKnownWord(statsMap[word.id]))
-  );
-
-  const knownSelection = knownWords.slice(
-    0,
-    Math.min(KNOWN_WORD_DAILY_LIMIT, remainingToday)
-  );
-  let slots = remainingToday - knownSelection.length;
-
-  const newSelection = newWords.slice(
-    0,
-    Math.min(DAILY_NEW_WORD_TARGET, slots)
-  );
-  slots -= newSelection.length;
-
-  const reviewSelection = reviewWords.slice(0, slots);
-  slots -= reviewSelection.length;
-
-  // 학습 초기에는 복습할 단어가 없으므로 남은 목표를 새 단어로 채운다.
-  const extraNewSelection = newWords.slice(
-    newSelection.length,
-    newSelection.length + slots
-  );
-  slots -= extraNewSelection.length;
-
-  // 새 단어도 부족할 때만 아직 숙지하지 못한 복습 단어로 남은 칸을 채운다.
-  const extraReviewSelection = reviewWords.slice(
-    reviewSelection.length,
-    reviewSelection.length + slots
-  );
-
-  const selectedNew = [...newSelection, ...extraNewSelection];
-  const selectedReview = [...reviewSelection, ...extraReviewSelection];
-
+export function buildDailyStudyPlan(words: KanjiTableRow[], statsMap: Record<number, WordStatRow>, now = new Date()): DailyStudyPlan {
+  const currentStats = Object.fromEntries(words.filter((word) => statsMap[word.id]).map((word) => [word.id, statsMap[word.id]]));
+  const completedToday = countStudiedToday(currentStats, now);
+  const capacity = Math.max(0, DAILY_STUDY_TARGET - completedToday);
+  const newToday = Object.values(currentStats).filter((stats) =>
+    stats.correctCount + stats.wrongCount === 1 && stats.lastAnsweredAt !== null &&
+    studyDayKey(new Date(stats.lastAnsweredAt)) === studyDayKey(now)).length;
+  const todayNumber = calendarDayNumber(now.getTime());
+  const due = words.filter((word) => {
+    const stats = currentStats[word.id];
+    if (!stats) return false;
+    if (stats.lastAnsweredAt === null) return true;
+    return todayNumber - calendarDayNumber(stats.lastAnsweredAt) >= reviewIntervalDays(stats);
+  }).sort((a, b) => {
+    const left = currentStats[a.id];
+    const right = currentStats[b.id];
+    const overdue = (stats: WordStatRow) => todayNumber - calendarDayNumber(stats.lastAnsweredAt ?? 0) - reviewIntervalDays(stats);
+    return overdue(right) - overdue(left) || getAccuracy(left) - getAccuracy(right);
+  });
+  // 복습 누적이 상한을 넘으면 새 단어를 추가하지 않는다.
+  const reviews = due.slice(0, capacity);
+  const newWords = shuffleArray(words.filter((word) => !currentStats[word.id]))
+    .slice(0, Math.min(Math.max(0, DAILY_NEW_WORD_TARGET - newToday), capacity - reviews.length));
+  const knownCount = reviews.filter((word) => isKnownWord(currentStats[word.id])).length;
+  const selected = [...reviews, ...newWords];
   return {
-    words: shuffleArray([
-      ...selectedReview,
-      ...selectedNew,
-      ...knownSelection,
-    ]),
-    completedToday,
-    remainingToday,
-    newCount: selectedNew.length,
-    reviewCount: selectedReview.length,
-    knownCount: knownSelection.length,
+    words: selected, completedToday, remainingToday: selected.length,
+    newCount: newWords.length, reviewCount: reviews.length - knownCount, knownCount,
   };
 }
